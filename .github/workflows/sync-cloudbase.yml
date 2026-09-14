@@ -1,0 +1,35 @@
+name: Sync CloudBase cache
+on:
+  push:
+    branches: [main]
+    paths: [content.json, scripts/sync-cloudbase.cjs, .github/workflows/sync-cloudbase.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cloudbase-cache-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: vars.TCB_FREE_QUOTA_CONFIRMED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate feed
+        run: node scripts/sync-cloudbase.cjs --check
+      - name: Install SDK
+        run: npm install --no-save --package-lock=false --ignore-scripts @cloudbase/node-sdk@3.18.3
+      - name: Sync and verify existing cache
+        run: node scripts/sync-cloudbase.cjs
+        env:
+          TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
+          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
+          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
+          TCB_FREE_QUOTA_CONFIRMED: ${{ vars.TCB_FREE_QUOTA_CONFIRMED }}
